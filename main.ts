@@ -1,5 +1,6 @@
-import { App, Editor, Notice, Modal, Plugin, PluginSettingTab, Setting, Vault, WorkspaceLeaf, MarkdownView, ItemView, TFile,} from 'obsidian';
-
+import { App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { CollabView, COLLAB_VIEW } from 'components/CollabView';
+import { InputUrlModal } from 'components/InputUrlModal';
 /** 
  * TODO:
  * 1. HANDLE THE COLLAB???
@@ -35,28 +36,13 @@ export default class MyPlugin extends Plugin {
 		const ribbonIconEl = this.addRibbonIcon('cable', 'Collab', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			new Notice('Work In Progress!');
-			new InputUriModal(this.app, (str) => {
-				new Notice(`You attempted to connect to ${str}!`)
-				this.init_socket(str);
-				this.intended_url = str;
-				this.app.vault.create("Collab_Connecting.md", "Loading...").then(
-					tmp_file => {
-						let leaf = this.app.workspace.getLeaf('tab');
-						let _view = new CollabView(leaf)
-						leaf.open(_view);
-						let file = this.app.vault.getFileByPath("Collab_Connecting.md");
-						if(file) {
-							leaf.openFile(file)
-						}
-					}
-				)			
-			}).open()
+			new InputUrlModal(this.app, (str) => this.handleEntryPoint(this, str)).open();
 		});
 		// test 'ws://localhost:8080'
 		this.registerInterval(
 		window.setInterval(
 			() => {
-				if(this.socket == null && this.intended_url != null &&
+				if(this.socket == null && this.intended_url &&
 				this.socket_intention == SocketIntention.Connecting) {
 					this.init_socket(this.intended_url)
 				}
@@ -64,6 +50,7 @@ export default class MyPlugin extends Plugin {
 			, 1000)
 		);
 	}
+
 	onunload() {
 
 	}
@@ -76,75 +63,64 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async updateStatusBar(str:string){
-
 		this.statusBar.setText(str);
 	}
 
+	async handleEntryPoint(plugin: MyPlugin, str: string) {
+		new Notice(`You attempted to connect to ${str}!`)
+		try {
+			plugin.init_socket(str);
+		}
+		catch (e) {
+			console.log(e)
+		}
+		
+		plugin.intended_url = str;
+		plugin.app.vault.create("Collab_Connecting.md", "Loading...").then(
+			tmp_file => {
+				let leaf = plugin.app.workspace.getLeaf('tab');
+				let _view = new CollabView(leaf);
+				leaf.open(_view);
+				let file = plugin.app.vault.getFileByPath("Collab_Connecting.md");
+				if(file) {
+					leaf.openFile(file);
+				}
+			}
+		)			
+	}
+	
 	async init_socket(url: string) {
 		try{
 			this.socket_intention = SocketIntention.Connecting
 			this.socket = new WebSocket(url);
 			this.socket.onopen = () => {
 				console.log('Connected to the WebSocket server.');
-				this.socket_intention = SocketIntention.Connected
+				this.socket_intention = SocketIntention.Connected;
 			}
 			
 			this.socket.onmessage = event => {
 				console.log('Received message:', event.data);
-				console.log(event)
+				console.log(event);
 				// Display the received markdown content in the output div
-				this.updateStatusBar(event.data)
+				this.updateStatusBar(event.data);
 			};
 		  
 			// Closed
 			this.socket.onclose = () => {
 				console.log('Disconnected from the WebSocket server.');
-				this.socket = null
-				this.socket_intention = SocketIntention.Resting
+				this.socket = null;
+				this.socket_intention = SocketIntention.Resting;
 			};
 		}
 		catch {
-			this.socket = null
+			this.socket = null;
 		}
 
 	}
 
 }
 
-export class InputUriModal extends Modal {
-	constructor(app: App, onSubmit: (result: string) => void) {
-		/**
-		 * On submit: require a function that takes a string and returns nothing
-		 */
-		super(app);
-		this.setTitle('Collab Url:');
-		let url = '';
-		new Setting(this.contentEl)
-			.setName('Url:')
-			.addText((text) =>
-			text.onChange((value) => {
-				url = value;
-			}));
-	
-		var bar = new Setting(this.contentEl)
-			.addButton((btn) =>
-			btn
-				.setButtonText('Submit')
-				.setCta()
-				.onClick(() => {
-				onSubmit(url);
-				this.close();
-				}));
-		
-		bar.addButton((btn) =>
-			btn
-				.setButtonText('Close')
-				.setCta()
-				.onClick(() => {
-				this.close();
-				}));
-	}
-  }
+
 
 class SampleSettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
@@ -172,22 +148,3 @@ class SampleSettingTab extends PluginSettingTab {
 	}
 }
 
-const COLLAB_VIEW = 'collab-view'
-class CollabView extends MarkdownView {
-	constructor(leaf: WorkspaceLeaf) {
-		super(leaf);
-	}
-
-	getViewType() {
-		return COLLAB_VIEW;
-	}
-
-	async onClose() {
-		console.log("closing view")
-		let collab_file = this.app.vault.getAbstractFileByPath("Collab_Connecting.md");
-		console.log(collab_file);
-		if (collab_file instanceof TFile) {
-				this.app.vault.delete(collab_file);
-		}
-	}
-}
