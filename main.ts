@@ -42,12 +42,12 @@ export default class MyPlugin extends Plugin {
 				this.app.vault.create("Collab_Connecting.md", "Loading...").then(
 					tmp_file => {
 						let leaf = this.app.workspace.getLeaf('tab');
-						console.log(leaf.getViewState());
-						leaf.openFile(tmp_file);
-						console.log(leaf.getViewState());
-						leaf.setViewState({type: COLLAB_VIEW, active: true});
-						console.log(leaf.getViewState());
-						this.app.workspace.revealLeaf(leaf);
+						let _view = new CollabView(leaf)
+						leaf.open(_view);
+						let file = this.app.vault.getFileByPath("Collab_Connecting.md");
+						if(file) {
+							leaf.openFile(file)
+						}
 					}
 				)			
 			}).open()
