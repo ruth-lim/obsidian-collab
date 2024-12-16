@@ -1,7 +1,10 @@
 import {App, Modal, Setting} from 'obsidian'
 
 export class InputUrlModal extends Modal {
-	constructor(app: App, onSubmit: (result: string) => void) {
+	socket: WebSocket | null;
+	unableToConnectElement: HTMLElement | null;
+	loadingElement: HTMLElement;
+	constructor(app: App, onSubmit: (result: WebSocket) => void) {
 		/**
 		 * On submit: require a function that takes a string and returns nothing
 		 */
@@ -22,8 +25,12 @@ export class InputUrlModal extends Modal {
 				.setClass('submitButton')
 				.setCta()
 				.onClick(() => {
-				onSubmit(url);
-				this.close();
+					this.establishConnection(url).then( () => {
+						console.log("Finished Establishing connection");
+						if (this.socket) {
+							onSubmit(this.socket);
+						}
+					});
 				}));
 		
 		bar.addButton((btn) =>
@@ -44,19 +51,52 @@ export class InputUrlModal extends Modal {
 				.item(0) as HTMLButtonElement | null;
 			actionBtn?.click();
 		});
+		
 	}
 
-	// onOpen() {
-	// 	const { contentEl } = this;
+	async establishConnection(url : string) {
+		if (this.loadingElement) {
+			this.loadingElement.show();
+		} else {
+			this.loadingElement = this.contentEl.createEl('p', { text: 'Loading', cls: 'loadingElement' });
+		}
+		
+		if (this.unableToConnectElement) {
+			this.unableToConnectElement.hide();
+		}
 
-	// 	const taskTitleLabel = contentEl.createEl('h6', { text: 'Test ' });
-	// 	const taskTitleInput = wrapper.createEl('input', { type: 'text', placeholder: 'Enter task title' });
-	// 	taskTitleInput.style.marginBottom = '10px';
+		this.socket = await this.initSocket(url);
+		if (this.socket) {
+			this.contentEl.empty();
+			this.close();
+		} else {
+			this.unableToConnectElement = this.contentEl.createEl('p', { text: `Unable to connect to ${url}`, cls: 'unableToConnect' });
+			this.unableToConnectElement.show();
+			this.loadingElement.hide();
+		}
+	}
 
-	// 	const timeWrapper = wrapper.createEl('div', { cls: 'time-input-wrapper' });
 
-	// 	const startTimeWrapper = timeWrapper.createEl('div', { cls: 'start-time-input-wrapper' });
-	// 	const startTimeInputTitle = startTimeWrapper.createEl('h6', { text: 'Task Start Time :' });
-	// 	const startTimeInput = startTimeWrapper.createEl('input', { type: 'time' });
-	// }
+	async initSocket(url: string) {
+		try {
+			let socketPromise = new Promise<WebSocket | null>(function(resolve, reject) {
+				var server = new WebSocket(url);
+				server.onopen = function() {
+					console.log('Connected to the WebSocket server.');
+					resolve(server);
+				};
+				server.onerror = function(err) {
+					console.log('Disconnected from the WebSocket server.');
+					reject(err);
+				};
+		
+			});
+			let socket = await socketPromise;
+			return socket;
+		}
+		catch { 
+			return null;
+		}
+
+	}
   }
