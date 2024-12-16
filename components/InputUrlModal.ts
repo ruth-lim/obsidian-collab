@@ -19,6 +19,7 @@ export class InputUrlModal extends Modal {
 			.addButton((btn) =>
 			btn
 				.setButtonText('Submit')
+				.setClass('submitButton')
 				.setCta()
 				.onClick(() => {
 				onSubmit(url);
@@ -27,10 +28,35 @@ export class InputUrlModal extends Modal {
 		
 		bar.addButton((btn) =>
 			btn
-				.setButtonText('Close')
+				.setButtonText('Cancel')
 				.setCta()
 				.onClick(() => {
 				this.close();
 				}));
+
+		// Enter to submit
+		this.scope.register([], 'Enter', (event: KeyboardEvent) => {
+			if (event.isComposing) {
+				return;
+			}
+			const actionBtn = document
+				.getElementsByClassName('submitButton')
+				.item(0) as HTMLButtonElement | null;
+			actionBtn?.click();
+		});
 	}
+
+	// onOpen() {
+	// 	const { contentEl } = this;
+
+	// 	const taskTitleLabel = contentEl.createEl('h6', { text: 'Test ' });
+	// 	const taskTitleInput = wrapper.createEl('input', { type: 'text', placeholder: 'Enter task title' });
+	// 	taskTitleInput.style.marginBottom = '10px';
+
+	// 	const timeWrapper = wrapper.createEl('div', { cls: 'time-input-wrapper' });
+
+	// 	const startTimeWrapper = timeWrapper.createEl('div', { cls: 'start-time-input-wrapper' });
+	// 	const startTimeInputTitle = startTimeWrapper.createEl('h6', { text: 'Task Start Time :' });
+	// 	const startTimeInput = startTimeWrapper.createEl('input', { type: 'time' });
+	// }
   }
