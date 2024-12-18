@@ -10,11 +10,11 @@ enum SocketIntention { //This is for checking connection status, if we're planni
 
 
 /**
- * TODO:
- * 1. Figure out how to time socket.onMessage with loading screen
- * 2. CollabLoadingView
- * 3. Handle files with same name
- * 4. Handle Collab
+ * TODO: 
+ * 
+ * 1. CollabLoadingView
+ * 2. Handle files with same name
+ * 3. Handle Collab
  * 
  */
 export class CollabInstance  {
@@ -28,7 +28,9 @@ export class CollabInstance  {
         this.socketIntention = SocketIntention.Resting;
         this.plugin = plugin;
         this.socket = socket;
-        this.socket.onmessage = this.handleMessage.bind(this);
+        this.socket.onmessage = (event: MessageEvent) => {
+            this.handleMessage(event);
+        }
 	}
 
     async handleMessage(event: MessageEvent) {
