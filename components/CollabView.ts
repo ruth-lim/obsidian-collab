@@ -1,15 +1,16 @@
 import {MarkdownView, WorkspaceLeaf, TFile} from 'obsidian'
+import { Socket } from "socket.io-client";
 
 export const COLLAB_VIEW = 'collab-view'
 export class CollabView extends MarkdownView {
 	title: string;
-	socket: WebSocket | null; // NULL is here because of the whacky implementation of the LoadingView.
+	socket: Socket| null;// NULL is here because of the whacky implementation of the LoadingView.
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
 	}
 
-	init(title: string, socket:WebSocket | null) {
+	init(title: string, socket:Socket | null) {
 		this.title = title;
 		this.socket = socket;
 	}

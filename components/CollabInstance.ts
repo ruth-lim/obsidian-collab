@@ -1,6 +1,7 @@
 import { Notice, TFile, WorkspaceLeaf} from 'obsidian';
 import MyPlugin from 'main';
 import { CollabView } from './CollabView';
+import { io, Socket} from "socket.io-client";
 
 enum SocketIntention { //This is for checking connection status, if we're planning to do periodic health checks.
     Resting = -1,
@@ -19,28 +20,36 @@ enum SocketIntention { //This is for checking connection status, if we're planni
  */
 export class CollabInstance  {
     socketIntention: SocketIntention;
-    socket: WebSocket;
+    socket: Socket;
     plugin: MyPlugin;
     file: TFile;
     leaf: WorkspaceLeaf;
 
-	constructor(plugin: MyPlugin, socket: WebSocket) {
+	constructor(plugin: MyPlugin, socket: Socket) {
         this.socketIntention = SocketIntention.Resting;
         this.plugin = plugin;
         this.socket = socket;
-        this.socket.onmessage = (event: MessageEvent) => {
-            this.handleMessage(event);
-        }
+        console.log(this.socket.id)
+        this.socket.on("update", (data: string) => {
+            this.handleUpdate(data);
+        });
+        this.socket.on("init", (data: string) => {
+            console.log(`Received init event. Data: ${data}`)
+            this.handleInit(data);
+        });
 	}
 
-    async handleMessage(event: MessageEvent) {
-        console.log('Received message:', event.data);
-        let data = JSON.parse(event.data);
-        if(data["firstMessage"]) {
-            console.log(`Tring to see file in socket.onmessage: ${this.file}`);
-            this.createPage(data);
-        }
+    async handleUpdate(raw_data: string) {
+        console.log('Received message:', raw_data);
+        let data = JSON.parse(raw_data);
     }
+
+    async handleInit(raw_data: string) {
+        console.log(`Tring to see file in socket.onmessage: ${this.file}`);
+        let data = JSON.parse(raw_data);
+        this.createPage(data);
+    }
+
     async open() {
         let entryPromise = this.handleEntry();
         await entryPromise;
@@ -48,10 +57,7 @@ export class CollabInstance  {
     }
 
     async handleEntry() { 
-		new Notice(`You are connected to ${this.socket.url}!`);
         const DEV_FILE_NAME = "Collab_Loading.md";
-
-
 		await this.plugin.app.vault.create(DEV_FILE_NAME, "Loading...").then( 
             /**
              * By right this should be a html page (maybe CollabLoadingView or sth) so we can reload the connection. 
@@ -61,7 +67,7 @@ export class CollabInstance  {
 			tmp_file => { 
 				this.leaf = this.plugin.app.workspace.getLeaf('tab');
 				let _view = new CollabView(this.leaf);
-                _view.init(DEV_FILE_NAME, null);
+                _view.init(DEV_FILE_NAME, this.socket);
 				this.leaf.open(_view);
 				let file = this.plugin.app.vault.getFileByPath(DEV_FILE_NAME);
 				if (file) {
@@ -71,14 +77,9 @@ export class CollabInstance  {
                 console.log(`Tring to see file in handleEntry: ${this.file}`);
 			}
 		)
-
-        this.socket.send("ready");
+        console.log(this.socket.id);
+        this.socket.emit("init", "ready");
 	}
-
-    async initContent() {
-        let response = await fetch(this.socket.url);
-        return await response.json();
-    }
 
     async createPage(data: any) { //dict
         this.leaf.detach();

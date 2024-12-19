@@ -1,10 +1,11 @@
-import {App, Modal, Setting} from 'obsidian'
+import { App, Modal, Setting } from 'obsidian';
+import { io, Socket} from "socket.io-client";
 
 export class InputUrlModal extends Modal {
-	socket: WebSocket | null;
+	socket: Socket | null;
 	unableToConnectElement: HTMLElement | null;
 	loadingElement: HTMLElement;
-	constructor(app: App, onSubmit: (result: WebSocket) => void) {
+	constructor(app: App, onSubmit: (result: Socket) => void) {
 		/**
 		 * On submit: require a function that takes a string and returns nothing
 		 */
@@ -28,6 +29,7 @@ export class InputUrlModal extends Modal {
 					this.establishConnection(url).then( () => {
 						console.log("Finished Establishing connection");
 						if (this.socket) {
+							console.log(`MODAL: ${this.socket.id}`);
 							onSubmit(this.socket);
 						}
 					});
@@ -79,22 +81,19 @@ export class InputUrlModal extends Modal {
 
 	async initSocket(url: string) {
 		try {
-			let socketPromise = new Promise<WebSocket | null>(function(resolve, reject) {
-				var server = new WebSocket(url);
-				server.onopen = function() {
+			let socketPromise = new Promise<Socket | null>(function(resolve, reject) {
+				var server = io(url);
+				server.on("connect", function() {
 					console.log('Connected to the WebSocket server.');
 					resolve(server);
-				};
-				server.onerror = function(err) {
-					console.log('Disconnected from the WebSocket server.');
-					reject(err);
-				};
-		
+				});
+				setTimeout(() => reject("Connection timed out."), 10000);
 			});
 			let socket = await socketPromise;
 			return socket;
 		}
-		catch { 
+		catch {
+			this.socket?.close();
 			return null;
 		}
 
