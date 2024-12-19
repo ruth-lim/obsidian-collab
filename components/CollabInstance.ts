@@ -10,7 +10,8 @@ enum SocketIntention { //This is for checking connection status, if we're planni
 
 
 /**
- * TODO:
+ * TODO: 
+ * 
  * 1. CollabLoadingView
  * 2. Handle files with same name
  * 3. Handle Collab
@@ -18,54 +19,64 @@ enum SocketIntention { //This is for checking connection status, if we're planni
  */
 export class CollabInstance  {
     socketIntention: SocketIntention;
-    socket: WebSocket | null;
-    intendedUrl: string;
+    socket: WebSocket;
     plugin: MyPlugin;
     file: TFile;
     leaf: WorkspaceLeaf;
 
-	constructor(plugin: MyPlugin, urlString: string){
+	constructor(plugin: MyPlugin, socket: WebSocket) {
         this.socketIntention = SocketIntention.Resting;
         this.plugin = plugin;
-        this.intendedUrl = urlString;
+        this.socket = socket;
+        this.socket.onmessage = (event: MessageEvent) => {
+            this.handleMessage(event);
+        }
 	}
 
+    async handleMessage(event: MessageEvent) {
+        console.log('Received message:', event.data);
+        let data = JSON.parse(event.data);
+        if(data["firstMessage"]) {
+            console.log(`Tring to see file in socket.onmessage: ${this.file}`);
+            this.createPage(data);
+        }
+    }
     async open() {
         let entryPromise = this.handleEntry();
         await entryPromise;
-        let socketPromise = this.initSocket(); //socket onMessage funtions are declared here
-        await socketPromise; 
-
-        if(this.socket) {
-            new Notice(`You are now connected to ${this.intendedUrl}!`); 
-        } else {
-            new Notice(`Was not able to connect to ${this.intendedUrl}!`);
-        }
+        // Do the collab??
     }
 
     async handleEntry() { 
-		new Notice(`You are attempting to connect to ${this.intendedUrl}!`);
-        const DEV_FILE_NAME = "Collab_Connecting.md";
+		new Notice(`You are connected to ${this.socket.url}!`);
+        const DEV_FILE_NAME = "Collab_Loading.md";
 
 
-		await this.plugin.app.vault.create(DEV_FILE_NAME, "Connecting...").then( //By right this should be a html page (maybe CollabLoadingView or sth) so we can reload the connection. 
+		await this.plugin.app.vault.create(DEV_FILE_NAME, "Loading...").then( 
+            /**
+             * By right this should be a html page (maybe CollabLoadingView or sth) so we can reload the connection. 
+             * If CollabLoadingView is implemented, rmb to edit CollabView as well. 
+             * 
+             */
 			tmp_file => { 
 				this.leaf = this.plugin.app.workspace.getLeaf('tab');
 				let _view = new CollabView(this.leaf);
-                _view.init(DEV_FILE_NAME);
+                _view.init(DEV_FILE_NAME, null);
 				this.leaf.open(_view);
 				let file = this.plugin.app.vault.getFileByPath(DEV_FILE_NAME);
-				if(file) {
+				if (file) {
                     this.file = file;
 					this.leaf.openFile(file);
 				}
                 console.log(`Tring to see file in handleEntry: ${this.file}`);
 			}
 		)
+
+        this.socket.send("ready");
 	}
 
     async initContent() {
-        let response = await fetch(this.intendedUrl);
+        let response = await fetch(this.socket.url);
         return await response.json();
     }
 
@@ -76,10 +87,10 @@ export class CollabInstance  {
 			tmp_file => {
 				this.leaf = this.plugin.app.workspace.getLeaf('tab');
 				let _view = new CollabView(this.leaf);
-                _view.init(data["title"]);
+                _view.init(data["title"], this.socket);
 				this.leaf.open(_view);
 				let file = this.plugin.app.vault.getFileByPath(data["title"]);
-				if(file) {
+				if (file) {
                     this.file = file;
 					this.leaf.openFile(file);
 				}
@@ -87,36 +98,4 @@ export class CollabInstance  {
 			}
 		)
     }
-
-    async initSocket() {
-		try {
-			this.socketIntention = SocketIntention.Connecting;
-			this.socket = new WebSocket(this.intendedUrl);
-			this.socket.onopen = () => {
-				console.log('Connected to the WebSocket server.');
-				this.socketIntention = SocketIntention.Connected;
-			}
-
-			this.socket.onmessage = event => {
-				console.log('Received message:', event.data);
-                let data = JSON.parse(event.data);
-                if(data["firstMessage"]) {
-                    console.log(`Tring to see file in socket.onmessage: ${this.file}`);
-                    this.createPage(data);
-                }
-			};
-            
-			// Closed
-			this.socket.onclose = () => {
-				console.log('Disconnected from the WebSocket server.');
-				this.socket = null;
-				this.socketIntention = SocketIntention.Resting;
-			};
-		}
-		catch { 
-			this.socket = null;
-		}
-
-	}
-
 }

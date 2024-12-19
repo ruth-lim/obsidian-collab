@@ -30,15 +30,9 @@ export default class MyPlugin extends Plugin {
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('cable', 'Collab', (evt: MouseEvent) => { // Called when the user clicks the icon.
 			new Notice('Work In Progress!');
-			new InputUrlModal(this.app, (urlString) => this.handleEntryPoint(urlString)).open();
+			new InputUrlModal(this.app, (socket) => new CollabInstance(this, socket).open()).open();
 		});
 	}
-
-	async handleEntryPoint(urlString: string) {
-		let collab = new CollabInstance(this, urlString);
-		collab.open();
-	}
-
 
 	onunload() {
 		let collabLeaves = this.app.workspace.getLeavesOfType(COLLAB_VIEW);
