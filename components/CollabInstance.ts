@@ -1,12 +1,13 @@
-import { Notice, TFile, WorkspaceLeaf} from 'obsidian';
+import { View, TFile, WorkspaceLeaf} from 'obsidian';
 import MyPlugin from 'main';
 import { CollabView } from './CollabView';
+import { CollabLoadingView, COLLAB__LOADING_VIEW } from './CollabLoadingView';
 import { io, Socket} from "socket.io-client";
 
-enum SocketIntention { //This is for checking connection status, if we're planning to do periodic health checks.
-    Resting = -1,
-    Connecting = 0,
-    Connected = 1
+export enum SocketIntention { //This is for checking connection status, if we're planning to do periodic health checks.
+    Disconnected = -1,
+    Loading = 0,
+    Loaded = 1
 }
 
 
@@ -24,9 +25,11 @@ export class CollabInstance  {
     plugin: MyPlugin;
     file: TFile;
     leaf: WorkspaceLeaf;
+    loadingView: CollabLoadingView;
+    view: CollabView;
 
 	constructor(plugin: MyPlugin, socket: Socket) {
-        this.socketIntention = SocketIntention.Resting;
+        this.socketIntention = SocketIntention.Loading;
         this.plugin = plugin;
         this.socket = socket;
         console.log(this.socket.id)
@@ -57,39 +60,26 @@ export class CollabInstance  {
     }
 
     async handleEntry() { 
-        const DEV_FILE_NAME = "Collab_Loading.md";
-		await this.plugin.app.vault.create(DEV_FILE_NAME, "Loading...").then( 
-            /**
-             * By right this should be a html page (maybe CollabLoadingView or sth) so we can reload the connection. 
-             * If CollabLoadingView is implemented, rmb to edit CollabView as well. 
-             * 
-             */
-			tmp_file => { 
-				this.leaf = this.plugin.app.workspace.getLeaf('tab');
-				let _view = new CollabView(this.leaf);
-                _view.init(DEV_FILE_NAME, this.socket);
-				this.leaf.open(_view);
-				let file = this.plugin.app.vault.getFileByPath(DEV_FILE_NAME);
-				if (file) {
-                    this.file = file;
-					this.leaf.openFile(file);
-				}
-                console.log(`Tring to see file in handleEntry: ${this.file}`);
-			}
-		)
+        this.leaf = this.plugin.app.workspace.getLeaf('tab');
+        this.loadingView = new CollabLoadingView(this.leaf);
+        await this.loadingView.init(this.socket);
+        await this.loadingView.setLoadingState(SocketIntention.Loading);
+        this.leaf.open(this.loadingView);
+        await this.leaf.setViewState({ type: COLLAB__LOADING_VIEW, active:true });
         console.log(this.socket.id);
         this.socket.emit("init", "ready");
 	}
 
     async createPage(data: any) { //dict
+        this.loadingView.setLoadingState(SocketIntention.Loaded);
         this.leaf.detach();
-        
+        console.log("Loading leaf detached");
         await this.plugin.app.vault.create(data["title"], data["content"]).then(  // Create tmp file for editing. TODO handle conflicting files
 			tmp_file => {
 				this.leaf = this.plugin.app.workspace.getLeaf('tab');
-				let _view = new CollabView(this.leaf);
-                _view.init(data["title"], this.socket);
-				this.leaf.open(_view);
+				this.view = new CollabView(this.leaf);
+                this.view.init(data["title"], this.socket);
+				this.leaf.open(this.view);
 				let file = this.plugin.app.vault.getFileByPath(data["title"]);
 				if (file) {
                     this.file = file;

@@ -14,7 +14,6 @@ export class CollabView extends MarkdownView {
 		this.title = title;
 		this.socket = socket;
 	}
-
 	
 	getViewType() {
 		return COLLAB_VIEW;
