@@ -45,7 +45,7 @@ export class CollabInstance  {
     }
 
     async handleInit(raw_data: string) {
-        console.log(`Tring to see file in socket.onmessage: ${this.file}`);
+        console.log(`Tring to see file in handleInit: ${this.file}`);
         let data = JSON.parse(raw_data);
         this.createPage(data);
     }

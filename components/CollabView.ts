@@ -27,9 +27,10 @@ export class CollabView extends MarkdownView {
 		if (collabFile instanceof TFile) {
 			this.app.vault.delete(collabFile);
 		}
-		if (this.socket) {
+		if (this.socket && this.socket?.connected) {
 			console.log('Websocket closed');
 			this.socket.close();
+			this.socket.off();
 		}
 	}
 }
