@@ -14,9 +14,8 @@ export enum SocketIntention { //This is for checking connection status, if we're
 /**
  * TODO: 
  * 
- * 1. CollabLoadingView
- * 2. Handle files with same name
- * 3. Handle Collab
+ * 1. Handle files with same name
+ * 2. Handle Collab
  * 
  */
 export class CollabInstance  {
@@ -74,13 +73,14 @@ export class CollabInstance  {
         this.loadingView.setLoadingState(SocketIntention.Loaded);
         this.leaf.detach();
         console.log("Loading leaf detached");
-        await this.plugin.app.vault.create(data["title"], data["content"]).then(  // Create tmp file for editing. TODO handle conflicting files
+        let title = await this.getTitle(data["title"]);
+        await this.plugin.app.vault.create(title, data["content"]).then(  // Create tmp file for editing. TODO handle conflicting files
 			tmp_file => {
 				this.leaf = this.plugin.app.workspace.getLeaf('tab');
 				this.view = new CollabView(this.leaf);
-                this.view.init(data["title"], this.socket);
+                this.view.init(title, this.socket);
 				this.leaf.open(this.view);
-				let file = this.plugin.app.vault.getFileByPath(data["title"]);
+				let file = this.plugin.app.vault.getFileByPath(title);
 				if (file) {
                     this.file = file;
 					this.leaf.openFile(file);
@@ -88,5 +88,39 @@ export class CollabInstance  {
                 console.log(`Tring to see file in handleEntry: ${this.file}`);
 			}
 		)
+    }
+
+    async getTitle(requestedTitle: string) {
+        /**
+         * To handle duplicate titles
+         */
+
+        let mdFiles = this.plugin.app.vault.getMarkdownFiles();
+        let extension = requestedTitle.substring(requestedTitle.length - 2, requestedTitle.length);
+        let name = requestedTitle.substring(0, requestedTitle.length);
+        let exists = false;
+        for (let i = 0; i < mdFiles.length; i++) {
+            if (mdFiles[i].name.match(`${name}.${extension}`)) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            return `${name}.${extension}`;
+        }
+
+        let mod = 1 
+        while (exists) {
+            exists = false;
+            for (let i = 0; i < mdFiles.length; i++) {
+                if (mdFiles[i].name.match(`${name} (${mod}).${extension}`)) {
+                    exists = true;
+                    mod++;
+                    break;
+                }
+            }
+        }
+        return `${name} (${mod}).${extension}`;
+        
     }
 }
