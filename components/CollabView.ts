@@ -1,5 +1,9 @@
-import {MarkdownView, WorkspaceLeaf, TFile} from 'obsidian'
+import {MarkdownView, WorkspaceLeaf, TFile} from 'obsidian';
 import { Socket } from "socket.io-client";
+import {ChangeSet, Text, EditorState, StateEffect} from "@codemirror/state";
+import {Update, rebaseUpdates} from "@codemirror/collab";
+import { EditorView } from "@codemirror/view";
+import { peerExtension } from './CodeMirrorCollab';
 
 export const COLLAB_VIEW = 'collab-view'
 export class CollabView extends MarkdownView {
@@ -9,10 +13,20 @@ export class CollabView extends MarkdownView {
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
 	}
+	
 
-	init(title: string, socket:Socket | null) {
+	async init(title: string, socket:Socket | null) {
 		this.title = title;
 		this.socket = socket;
+		// @ts-expect-error, not typed
+		console.log(this.editor.cm);
+		if (socket) {
+			// @ts-expect-error, not typed
+			this.editor.cm.dispatch({
+				effects: StateEffect.appendConfig.of(peerExtension(0, socket))
+			});
+		}
+		console.log("Plugin dispatched");
 	}
 	
 	getViewType() {

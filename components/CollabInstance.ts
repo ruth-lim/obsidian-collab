@@ -4,6 +4,10 @@ import { CollabView } from './CollabView';
 import { CollabLoadingView, COLLAB__LOADING_VIEW } from './CollabLoadingView';
 import { io, Socket} from "socket.io-client";
 
+import { basicSetup } from 'codemirror';
+import {ChangeSet, Text, EditorState} from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+
 export enum SocketIntention { //This is for checking connection status, if we're planning to do periodic health checks.
     Disconnected = -1,
     Loading = 0,
@@ -14,8 +18,7 @@ export enum SocketIntention { //This is for checking connection status, if we're
 /**
  * TODO: 
  * 
- * 1. Handle files with same name
- * 2. Handle Collab
+ * 1. Handle Collab
  * 
  */
 export class CollabInstance  {
@@ -32,19 +35,11 @@ export class CollabInstance  {
         this.plugin = plugin;
         this.socket = socket;
         console.log(this.socket.id)
-        this.socket.on("update", (data: string) => {
-            this.handleUpdate(data);
-        });
         this.socket.on("init", (data: string) => {
             console.log(`Received init event. Data: ${data}`)
             this.handleInit(data);
         });
 	}
-
-    async handleUpdate(raw_data: string) {
-        console.log('Received message:', raw_data);
-        let data = JSON.parse(raw_data);
-    }
 
     async handleInit(raw_data: string) {
         console.log(`Tring to see file in handleInit: ${this.file}`);
@@ -74,20 +69,21 @@ export class CollabInstance  {
         this.leaf.detach();
         console.log("Loading leaf detached");
         let title = await this.getTitle(data["title"]);
-        await this.plugin.app.vault.create(title, data["content"]).then(  // Create tmp file for editing. TODO handle conflicting files
-			tmp_file => {
-				this.leaf = this.plugin.app.workspace.getLeaf('tab');
-				this.view = new CollabView(this.leaf);
-                this.view.init(title, this.socket);
-				this.leaf.open(this.view);
-				let file = this.plugin.app.vault.getFileByPath(title);
-				if (file) {
-                    this.file = file;
-					this.leaf.openFile(file);
-				}
-                console.log(`Tring to see file in handleEntry: ${this.file}`);
-			}
-		)
+        await this.plugin.app.vault.create(title, data["content"])  // Create tmp file for editing. TODO handle conflicting files
+        this.leaf = this.plugin.app.workspace.getLeaf('tab');
+        this.view = new CollabView(this.leaf);
+        
+        await this.leaf.open(this.view);
+        let file = this.plugin.app.vault.getFileByPath(title);
+        if (file) {
+            this.file = file;
+            await this.leaf.openFile(file);
+        }
+        await this.view.init(title, this.socket);
+        // @ts-expect-error, not typed
+        console.log(this.leaf.view.editor.cm);
+        console.log(`Tring to see file in createPage: ${this.file}`);
+        
     }
 
     async getTitle(requestedTitle: string) {
